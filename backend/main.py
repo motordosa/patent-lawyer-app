@@ -25,7 +25,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://frontend-kappa-two-59.vercel.app",
+        "https://patent-lawyer-backend-production.up.railway.app",
+        "*",  # fallback — restrict after Railway URL confirmed
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

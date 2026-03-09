@@ -204,7 +204,7 @@ export default function Library() {
     const [filter, setFilter] = useState('all')
 
     useEffect(() => {
-        projectsAPI.list().then(r => { setProjects(r.data); setLoading(false) }).catch(() => setLoading(false))
+        projectsAPI.list().then(r => { setProjects(r.data || []); setLoading(false) }).catch(() => setLoading(false))
     }, [])
 
     const filtered = projects.filter(p => {

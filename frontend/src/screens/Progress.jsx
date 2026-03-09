@@ -161,9 +161,25 @@ export default function Progress() {
     const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
 
+    const fetchProjects = () => {
+        projectsAPI.list().then(r => setProjects(r.data || [])).catch(() => { })
+    }
+
     useEffect(() => {
-        projectsAPI.list().then(r => setProjects(r.data)).catch(() => { })
+        fetchProjects()
     }, [])
+
+    // Auto-refresh every 5 seconds when pipeline is running
+    useEffect(() => {
+        if (!selectedId) return
+        const selected = projects.find(p => p.id === selectedId)
+        const overall = selected
+            ? Math.round(STAGES.reduce((a, s) => a + (selected[s.key] || 0), 0) / STAGES.length)
+            : 0
+        if (overall >= 100) return  // done, no need to poll
+        const interval = setInterval(fetchProjects, 5000)
+        return () => clearInterval(interval)
+    }, [selectedId, projects])
 
     const selected = projects.find(p => p.id === selectedId)
     const overall = selected

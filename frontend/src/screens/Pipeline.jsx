@@ -148,14 +148,13 @@ export default function Pipeline() {
 
     // ── Phase 1 → 2: trigger research ────────────────────────────────────────────
     async function startResearch() {
-        if (!selectedProject || !idea.trim()) return
+        if (!selectedProject || !idea.trim() || loading) return
         setError(null); setLoading(true)
         setLoadingMsg('웹/특허/논문 자동 검색 중...')
         setPhase(2); top()
         try {
             const r = await pAPI.step1Research({ project_id: selectedProject.id, initial_idea: idea })
             setStep1Result(r.data)
-            // pre-init answers keys so inputs render
             const init = {}
             r.data.gap_analysis?.gap_questions?.forEach(q => { init[q.key] = '' })
             setGapAnswers(init)
@@ -203,8 +202,10 @@ export default function Pipeline() {
 
     // ── Phase 5 → 6: Audit ────────────────────────────────────────────────────
     async function runAudit() {
+        if (loading) return
         setError(null); setLoading(true)
-        setLoadingMsg('가상 심사 진행 중...'); top()
+        setPhase(6); top()  // ← 가상 심사 로딩 화면 표시
+        setLoadingMsg('가상 심사 진행 중...')
         try {
             const r5 = await pAPI.step5Audit({ project_id: selectedProject.id, accepted_amendments: [] })
             setStep5Result(r5.data)
@@ -232,7 +233,10 @@ export default function Pipeline() {
     const auditData = step5Result?.audit_data || {}
     const gapQuestions = step1Result?.gap_analysis?.gap_questions || []
     const researchItems = step1Result?.research_items || []
-    const allRequired = gapQuestions.filter(q => q.required).every(q => (gapAnswers[q.key] || '').trim())
+    // 필수 항목 중 하나라도 입력되면 진행 허용 (완전히 비어있어도 Skip 버튼으로 진행 가능)
+    const requiredQuestions = gapQuestions.filter(q => q.required)
+    const anyRequiredFilled = requiredQuestions.length === 0 || requiredQuestions.some(q => (gapAnswers[q.key] || '').trim())
+    const allRequired = anyRequiredFilled  // 하나라도 채우면 활성화
 
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -247,8 +251,9 @@ export default function Pipeline() {
 
             <div ref={scrollRef} style={{ flex: 1, overflow: 'auto', padding: '4px 20px', paddingBottom: 100 }}>
                 {error && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.3)', color: 'var(--danger)', fontSize: 12, marginBottom: 12 }}>
-                        ⚠️ {error}
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.3)', color: 'var(--danger)', fontSize: 12, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                        <span>⚠️ {error}</span>
+                        <button onClick={() => { setError(null); setPhase(1) }} style={{ flexShrink: 0, padding: '3px 10px', borderRadius: 8, background: 'rgba(255,69,58,0.15)', border: '1px solid rgba(255,69,58,0.4)', color: 'var(--danger)', fontSize: 11, cursor: 'pointer' }}>처음으로</button>
                     </motion.div>
                 )}
 
@@ -363,16 +368,14 @@ export default function Pipeline() {
                                 ))}
                             </SectionCard>
 
-                            {!allRequired && (
-                                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textAlign: 'center', marginBottom: 8 }}>
-                                    * 표시 필수 항목을 입력해야 다음 단계로 진행됩니다
-                                </div>
-                            )}
+                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,159,10,0.06)', border: '1px solid rgba(255,159,10,0.15)' }}>
+                                💡 * 표시 항목은 특허 명세서 품질 향상에 중요합니다. 모르는 경우 건너뛰고 진행해도 됩니다.
+                            </div>
 
                             {loading ? <LoadingCard message={loadingMsg} /> : (
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     <button onClick={() => setPhase(1)} style={{ padding: '13px 16px', borderRadius: 14, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', fontSize: 14 }}>←</button>
-                                    <button className="btn-primary" onClick={analyzeTechSpec} disabled={!allRequired} style={{ flex: 1, background: allRequired ? 'linear-gradient(135deg, var(--accent-teal), var(--accent-blue))' : undefined }}>
+                                    <button className="btn-primary" onClick={analyzeTechSpec} style={{ flex: 1, background: 'linear-gradient(135deg, var(--accent-teal), var(--accent-blue))' }}>
                                         🔬 기술 명세서 생성 + 특허 검색 →
                                     </button>
                                 </div>
