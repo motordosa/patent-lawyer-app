@@ -1,16 +1,9 @@
-# FastAPI backend for Railway deployment
+# Railway deployment for FastAPI backend
 [build]
 builder = "nixpacks"
-
-[build.buildCommand]
-cmd = "pip install -r requirements.txt"
 
 [deploy]
 startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
-
-[deploy.environmentVariables]
-MOCK_MODE = "false"
-LANGUAGE = "ko"
