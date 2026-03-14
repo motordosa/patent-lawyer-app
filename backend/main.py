@@ -30,8 +30,8 @@ app.add_middleware(
         "http://localhost:3000",
         "https://frontend-kappa-two-59.vercel.app",
         "https://patent-lawyer-backend-production.up.railway.app",
-        "*",  # fallback — restrict after Railway URL confirmed
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
