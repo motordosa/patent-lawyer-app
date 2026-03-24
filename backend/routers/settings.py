@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from services.db_service import (
     get_user_profile, update_user_profile,
-    get_all_settings, set_settings_bulk
+    get_all_settings, API_KEY_FIELDS
 )
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -74,30 +74,36 @@ async def update_profile(body: UserProfileUpdate):
 
 @router.get("/")
 async def get_settings():
+    """Return settings status. API key VALUES are never exposed to frontend."""
     settings = await get_all_settings()
-    # Mask API keys for security - only show if set or not
     masked = {}
     for key in SETTINGS_KEYS:
         val = settings.get(key, "")
-        if key.endswith("_api_key") and val:
-            # Show last 4 chars only
-            masked[key] = "•" * (len(val) - 4) + val[-4:] if len(val) > 4 else "••••"
-            masked[f"{key}_is_set"] = True
+        if key in API_KEY_FIELDS:
+            # Never expose key values — only is_set boolean
+            masked[f"{key}_is_set"] = bool(val)
         else:
             masked[key] = val
-            if key.endswith("_api_key"):
-                masked[f"{key}_is_set"] = False
     masked["avatar_options"] = AVATAR_OPTIONS
     return masked
 
 
+# NOTE: PUT /settings/ (API key write) has been moved to /admin/settings
+# Only preferences (preferred_llm, preferred_search, language) can still be updated here
+class PreferencesUpdate(BaseModel):
+    preferred_llm: Optional[str] = None
+    preferred_search: Optional[str] = None
+    language: Optional[str] = None
+
 @router.put("/")
-async def update_settings(body: SettingsUpdate):
+async def update_preferences(body: PreferencesUpdate):
+    """Update non-sensitive preferences only (LLM/search choice, language)."""
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if not updates:
-        raise HTTPException(status_code=400, detail="No settings to update")
+        raise HTTPException(status_code=400, detail="No preferences to update")
+    from services.db_service import set_settings_bulk
     await set_settings_bulk(updates)
-    return {"message": "Settings updated", "updated_keys": list(updates.keys())}
+    return {"message": "Preferences updated", "updated_keys": list(updates.keys())}
 
 
 @router.get("/api-status")

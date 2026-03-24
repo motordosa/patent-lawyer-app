@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from services.db_service import init_db
-from routers import projects, ideation, clearance, drafting, audit, settings, research, analysis, pipeline
+from routers import projects, ideation, clearance, drafting, audit, settings, research, analysis, pipeline, auth, admin
 
 
 @asynccontextmanager
@@ -46,6 +46,8 @@ app.include_router(settings.router)
 app.include_router(research.router)
 app.include_router(analysis.router)
 app.include_router(pipeline.router)
+app.include_router(auth.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

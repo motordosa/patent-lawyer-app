@@ -1,13 +1,16 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
+import { useAuth, AuthProvider } from './AuthContext'
 import Dashboard from './screens/Dashboard'
 import Pipeline from './screens/Pipeline'
 import Progress from './screens/Progress'
 import ResearchAnalysis from './screens/ResearchAnalysis'
 import Settings from './screens/Settings'
 import Library from './screens/Library'
+import Login from './screens/Login'
 import './index.css'
 
 function TabBar() {
+  const { user, logout } = useAuth()
   const tabs = [
     { to: '/', icon: '⬡', label: '대시보드' },
     { to: '/pipeline', icon: '🚀', label: '파이프라인' },
@@ -32,9 +35,26 @@ function TabBar() {
   )
 }
 
-function App() {
+// Gates all main routes — redirect to /login if not authenticated
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg-primary)'
+      }}>
+        <div className="spinner" style={{ width: 36, height: 36 }} />
+      </div>
+    )
+  }
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
+
+function MainLayout() {
   return (
-    <BrowserRouter>
+    <ProtectedRoute>
       <div className="app-container">
         <div className="bg-orb bg-orb-1" />
         <div className="bg-orb bg-orb-2" />
@@ -55,8 +75,29 @@ function App() {
         </div>
         <TabBar />
       </div>
-    </BrowserRouter>
+    </ProtectedRoute>
   )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/*" element={<MainLayout />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
+
+// Redirect logged-in users away from login page
+function PublicRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  if (user) return <Navigate to="/" replace />
+  return children
 }
 
 export default App

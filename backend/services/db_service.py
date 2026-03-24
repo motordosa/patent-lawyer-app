@@ -2,6 +2,7 @@ import aiosqlite
 import json
 import os
 from datetime import datetime
+from services.auth_service import encrypt_value, decrypt_value, hash_password
 
 DATABASE_URL = os.getenv("DATABASE_URL", "./patent_app.db")
 
@@ -83,6 +84,27 @@ CREATE TABLE IF NOT EXISTS app_settings (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT DEFAULT '',
+    hashed_password TEXT NOT NULL,
+    is_admin INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    display_name TEXT DEFAULT '',
+    avatar_emoji TEXT DEFAULT '👤',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS research_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
@@ -131,6 +153,21 @@ async def init_db():
                 await db.commit()
             except Exception:
                 pass  # column already exists → ignore
+
+        # ── Seed default admin account if not exists ──────────────────────────
+        now = datetime.utcnow().isoformat()
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        if not await cursor.fetchone():
+            admin_pw = os.getenv("ADMIN_PASSWORD", "admin1234")
+            hashed = hash_password(admin_pw)
+            await db.execute(
+                "INSERT INTO users (username, email, hashed_password, is_admin, is_active, display_name, avatar_emoji, created_at, updated_at) "
+                "VALUES (?, ?, ?, 1, 1, '관리자', '👨‍💼', ?, ?)",
+                ("admin", "admin@patent-app.local", hashed, now, now)
+            )
+            await db.commit()
+            print(f"[INFO] Default admin account created. Username: admin, Password: {admin_pw}")
+            print("[WARNING] Please change the admin password immediately!")
 
 
 
@@ -341,21 +378,51 @@ async def update_user_profile(name: str, title: str, organization: str,
 
 
 # ── App Settings (API Keys, Preferences) ──────────────────────────────────
+API_KEY_FIELDS = {
+    "openai_api_key", "anthropic_api_key", "google_api_key", "groq_api_key",
+    "perplexity_api_key", "tavily_api_key", "serper_api_key", "exa_api_key",
+    "kipris_api_key", "patsnap_api_key", "lens_api_key",
+}
+
+
 async def get_all_settings() -> dict:
+    """Get all settings, decrypting API keys for internal use."""
     async with aiosqlite.connect(DATABASE_URL) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute("SELECT key, value FROM app_settings")
         rows = await cursor.fetchall()
-        return {r['key']: r['value'] for r in rows}
+        result = {}
+        for r in rows:
+            k, v = r['key'], r['value']
+            # Decrypt API keys transparently
+            if k in API_KEY_FIELDS and v:
+                result[k] = decrypt_value(v)
+            else:
+                result[k] = v
+        return result
+
+
+async def get_settings_status() -> dict:
+    """Get is_set booleans only (safe to send to frontend)."""
+    raw = await get_all_settings()
+    status = {}
+    for k, v in raw.items():
+        if k in API_KEY_FIELDS:
+            status[f"{k}_is_set"] = bool(v)
+        else:
+            status[k] = v
+    return status
 
 
 async def set_setting(key: str, value: str):
     now = datetime.utcnow().isoformat()
+    # Encrypt API keys before storage
+    stored_value = encrypt_value(value) if key in API_KEY_FIELDS and value else value
     async with aiosqlite.connect(DATABASE_URL) as db:
         await db.execute(
             "INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
-            (key, value, now)
+            (key, stored_value, now)
         )
         await db.commit()
 
@@ -364,10 +431,11 @@ async def set_settings_bulk(settings: dict):
     now = datetime.utcnow().isoformat()
     async with aiosqlite.connect(DATABASE_URL) as db:
         for key, value in settings.items():
+            stored_value = encrypt_value(str(value)) if key in API_KEY_FIELDS and value else str(value)
             await db.execute(
                 "INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?) "
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
-                (key, str(value), now)
+                (key, stored_value, now)
             )
         await db.commit()
 
@@ -440,3 +508,69 @@ async def get_analysis(project_id: int) -> list:
             item['recommendations'] = json.loads(item['recommendations'])
             result.append(item)
         return result
+
+
+# ── User Management ─────────────────────────────────────────────────────────
+async def get_user_by_username(username: str) -> dict | None:
+    async with aiosqlite.connect(DATABASE_URL) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM users WHERE username = ?", (username,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_user_by_id(user_id: int) -> dict | None:
+    async with aiosqlite.connect(DATABASE_URL) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_all_users() -> list:
+    async with aiosqlite.connect(DATABASE_URL) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT id, username, email, is_admin, is_active, display_name, avatar_emoji, created_at, updated_at FROM users ORDER BY created_at DESC")
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def create_user(username: str, email: str, password: str, is_admin: bool = False, display_name: str = "", avatar_emoji: str = "👤") -> dict:
+    now = datetime.utcnow().isoformat()
+    hashed = hash_password(password)
+    async with aiosqlite.connect(DATABASE_URL) as db:
+        cursor = await db.execute(
+            "INSERT INTO users (username, email, hashed_password, is_admin, is_active, display_name, avatar_emoji, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)",
+            (username, email, hashed, int(is_admin), display_name or username, avatar_emoji, now, now)
+        )
+        await db.commit()
+        return await get_user_by_id(cursor.lastrowid)
+
+
+async def toggle_user_active(user_id: int) -> dict | None:
+    user = await get_user_by_id(user_id)
+    if not user:
+        return None
+    new_active = 0 if user["is_active"] else 1
+    now = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DATABASE_URL) as db:
+        await db.execute("UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?", (new_active, now, user_id))
+        await db.commit()
+    return await get_user_by_id(user_id)
+
+
+async def update_user_password(user_id: int, new_password: str) -> bool:
+    now = datetime.utcnow().isoformat()
+    hashed = hash_password(new_password)
+    async with aiosqlite.connect(DATABASE_URL) as db:
+        await db.execute("UPDATE users SET hashed_password = ?, updated_at = ? WHERE id = ?", (hashed, now, user_id))
+        await db.commit()
+    return True
+
+
+async def delete_user(user_id: int) -> bool:
+    async with aiosqlite.connect(DATABASE_URL) as db:
+        await db.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
+        await db.execute("DELETE FROM users WHERE id = ? AND is_admin = 0", (user_id,))
+        await db.commit()
+    return True
