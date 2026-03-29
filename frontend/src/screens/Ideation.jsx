@@ -63,7 +63,7 @@ function IdeationStage({ project, onComplete }) {
             const res = await ideationAPI.generate({ project_id: project.id, raw_idea: idea })
             setResult(res.data)
             onComplete('ideation')
-        } catch (e) {
+        } catch (_e) {
             setError('백엔드 서버 연결 실패. 서버가 실행 중인지 확인하세요.')
         } finally { setLoading(false) }
     }
@@ -182,7 +182,7 @@ function ClearanceStage({ project, ideationResult, onComplete }) {
             })
             setResult(res.data)
             onComplete('clearance')
-        } catch (e) {
+        } catch (_e) {
             setError('백엔드 서버 연결 실패.')
         } finally { setLoading(false) }
     }
@@ -325,7 +325,7 @@ function DraftingStage({ project, ideationResult, clearanceResult, onComplete })
             })
             setDraft(res.data.draft)
             onComplete('drafting')
-        } catch (e) {
+        } catch (_e) {
             setError('초안 생성 실패.')
         } finally { setLoading(false) }
     }
@@ -452,7 +452,7 @@ function AuditStage({ project, draftResult, onComplete }) {
             })
             setAudit(res.data)
             onComplete('audit')
-        } catch (e) {
+        } catch (_e) {
             setError('심사 실패.')
         } finally { setLoading(false) }
     }
@@ -615,10 +615,10 @@ export default function Ideation() {
         try {
             const res = await projectsAPI.get(selectedProject.id)
             setSelectedProject(res.data)
-        } catch (e) { }
+        } catch (_e) { /* ignore */ }
     }
 
-    function handleStageComplete(stage) {
+    function handleStageComplete(_stage) {
         refreshProject()
     }
 
@@ -659,21 +659,21 @@ export default function Ideation() {
                 <AnimatePresence mode="wait">
                     {activeStage === 'ideation' && (
                         <motion.div key="ideation" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                            <IdeationStage project={selectedProject} onComplete={(s) => { setIdeationResult(null); refreshProject() }}
+                            <IdeationStage project={selectedProject} onComplete={(_s) => { setIdeationResult(null); refreshProject() }}
                                 setResult={setIdeationResult} />
                         </motion.div>
                     )}
                     {activeStage === 'clearance' && (
                         <motion.div key="clearance" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                             <ClearanceStage project={selectedProject} ideationResult={ideationResult}
-                                onComplete={(s) => { setClearanceResult(null); refreshProject() }} />
+                                onComplete={(_s) => { setClearanceResult(null); refreshProject() }} />
                         </motion.div>
                     )}
                     {activeStage === 'drafting' && (
                         <motion.div key="drafting" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                             <DraftingStage project={selectedProject} ideationResult={ideationResult}
                                 clearanceResult={clearanceResult}
-                                onComplete={(s) => { setDraftResult(null); refreshProject() }} />
+                                onComplete={(_s) => { setDraftResult(null); refreshProject() }} />
                         </motion.div>
                     )}
                     {activeStage === 'audit' && (

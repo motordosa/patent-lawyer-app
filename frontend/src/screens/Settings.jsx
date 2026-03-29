@@ -298,7 +298,7 @@ export default function Settings() {
             await settingsAPI.updateProfile(profile)
             setSaved(true)
             setTimeout(() => setSaved(false), 2000)
-        } catch (e) { } finally { setSaving(false) }
+        } catch (_e) { /* ignore */ } finally { setSaving(false) }
     }
 
     async function saveAdminApiKey(key, value) {

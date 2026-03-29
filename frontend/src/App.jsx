@@ -10,7 +10,6 @@ import Login from './screens/Login'
 import './index.css'
 
 function TabBar() {
-  const { user, logout } = useAuth()
   const tabs = [
     { to: '/', icon: '⬡', label: '대시보드' },
     { to: '/pipeline', icon: '🚀', label: '파이프라인' },

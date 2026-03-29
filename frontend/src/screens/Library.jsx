@@ -58,9 +58,9 @@ function DetailPanel({ project, onClose }) {
         async function load() {
             setLoading(true)
             const results = {}
-            try { results.ideation = (await ideationAPI.get(project.id)).data } catch { }
-            try { results.draft = (await draftingAPI.get(project.id)).data } catch { }
-            try { results.audit = (await auditAPI.get(project.id)).data } catch { }
+            try { results.ideation = (await ideationAPI.get(project.id)).data } catch { /* ignore */ }
+            try { results.draft = (await draftingAPI.get(project.id)).data } catch { /* ignore */ }
+            try { results.audit = (await auditAPI.get(project.id)).data } catch { /* ignore */ }
             setData(results)
             setLoading(false)
         }

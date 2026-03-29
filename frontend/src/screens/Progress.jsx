@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { projectsAPI } from '../services/api'
 import API from '../services/api'
 
-const pipelineAPI = { getResult: (id) => API.get(`/pipeline/result/${id}`) }
+const _pipelineAPI = { getResult: (id) => API.get(`/pipeline/result/${id}`) }
 
 const STAGES = [
     { key: 'ideation_progress', label: '기술 명세서', icon: '💡', color: '#5E5CE6', desc: '아이디어 → 기술 명세서' },
@@ -158,7 +158,6 @@ function OverallRing({ overall }) {
 export default function Progress() {
     const [projects, setProjects] = useState([])
     const [selectedId, setSelectedId] = useState(null)
-    const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
 
     const fetchProjects = () => {

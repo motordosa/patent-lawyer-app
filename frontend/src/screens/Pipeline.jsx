@@ -135,7 +135,7 @@ function ProgressGraph({ phase, phaseTimes, autoRunning }) {
                         style={{ fontSize: 10, color: 'var(--accent-blue)', fontWeight: 600 }}>● 자동 진행 중</motion.span>
                 )}
             </div>
-            {steps.map((s, i) => {
+            {steps.map((s, _i) => {
                 const phaseNum = Math.floor(phase)
                 const isDone = phaseNum > s.id
                 const isCurrent = phaseNum === s.id
@@ -194,8 +194,8 @@ export default function Pipeline() {
     const [step3Result, setStep3Result] = useState(null)
     const [selectedStrategy, setSelectedStrategy] = useState(null)
     const [strategyNotes, setStrategyNotes] = useState('')
-    const [step4Result, setStep4Result] = useState(null)
-    const [step5Result, setStep5Result] = useState(null)
+    const [_step4Result, setStep4Result] = useState(null)
+    const [_step5Result, setStep5Result] = useState(null)
     const [step6Result, setStep6Result] = useState(null)
     const [proposalSection, setProposalSection] = useState('summary')
     const [patentabilityResult, setPatentabilityResult] = useState(null)
